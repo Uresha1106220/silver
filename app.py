@@ -14,7 +14,7 @@ CORS(app)
 # ─────────────────────────────────────────────
 # DATABASE CONFIGURATION
 # ─────────────────────────────────────────────
-DB_HOST = os.environ.get('MYSQL_HOST', 'syncstroam.in') # Can be overwritten via Render Env Variables
+DB_HOST = os.environ.get('MYSQL_HOST', 'srv2205.hstgr.io') # Can be overwritten via Render Env Variables
 DB_NAME = 'u635307059_u12345_db'
 DB_USER = 'u635307059_u12345_usr'
 DB_PASS = 'Urvisha1213$'
