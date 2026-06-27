@@ -1,9 +1,12 @@
 from flask import Flask, request, jsonify
 import os
+import json
 import pymysql
 import pymysql.cursors
 from datetime import datetime
 from flask_cors import CORS
+
+DATABASE_FILE = 'database.json'
 
 app = Flask(__name__)
 CORS(app)
@@ -83,9 +86,74 @@ def init_db():
     finally:
         conn.close()
 
-# Initialize tables
+# Initialize tables and seed data
+def seed_database_from_file():
+    if not os.path.exists(DATABASE_FILE):
+        return
+    
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT COUNT(*) as count FROM users")
+            user_count = cursor.fetchone()['count']
+            
+            cursor.execute("SELECT COUNT(*) as count FROM projects")
+            project_count = cursor.fetchone()['count']
+            
+            cursor.execute("SELECT COUNT(*) as count FROM inquiries")
+            inquiry_count = cursor.fetchone()['count']
+            
+            # Seed only if database is completely fresh and empty
+            if user_count == 0 and project_count == 0 and inquiry_count == 0:
+                with open(DATABASE_FILE, 'r') as f:
+                    seed_data = json.load(f)
+                
+                # Seed Users
+                for u in seed_data.get('users', []):
+                    pps = ",".join(u.get('purchasedProjects', [])) if isinstance(u.get('purchasedProjects'), list) else ''
+                    cursor.execute(
+                        "INSERT INTO users (id, name, email, password, createdAt, purchasedProjects) VALUES (%s, %s, %s, %s, %s, %s)",
+                        (u.get('id'), u.get('name'), u.get('email'), u.get('password'), u.get('createdAt'), pps)
+                    )
+                
+                # Seed Projects
+                for p in seed_data.get('projects', []):
+                    cursor.execute(
+                        """INSERT INTO projects (id, name, category, description, price, image, 
+                           projectFiles, projectFilesName, requirements, documentation, demoUrl, 
+                           sellerId, sellerName, status, createdAt, likes) 
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                        (
+                            p.get('id'), p.get('name'), p.get('category'), p.get('description'), 
+                            float(p.get('price', 0)), p.get('image'), p.get('projectFiles'), 
+                            p.get('projectFilesName'), p.get('requirements'), p.get('documentation'), 
+                            p.get('demoUrl'), p.get('sellerId'), p.get('sellerName'), 
+                            p.get('status', 'pending'), p.get('createdAt'), p.get('likes', 0)
+                        )
+                    )
+                
+                # Seed Inquiries
+                for i in seed_data.get('inquiries', []):
+                    cursor.execute(
+                        """INSERT INTO inquiries (id, projectId, projectName, sellerId, sellerName, 
+                           userId, userName, email, phone, message, status, createdAt) 
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                        (
+                            i.get('id'), i.get('projectId'), i.get('projectName'), i.get('sellerId'),
+                            i.get('sellerName'), i.get('userId'), i.get('userName'), i.get('email'),
+                            i.get('phone'), i.get('message'), i.get('status', 'pending'), i.get('createdAt')
+                        )
+                    )
+                conn.commit()
+                print("Database successfully seeded from database.json!")
+    except Exception as err:
+        print("Database seeding failed:", err)
+    finally:
+        conn.close()
+
 try:
     init_db()
+    seed_database_from_file()
 except Exception as e:
     print("Warning: Database connection failed during initialization. Verify Host/Credentials:", e)
 
